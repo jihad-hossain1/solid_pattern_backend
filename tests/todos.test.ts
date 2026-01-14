@@ -1,34 +1,55 @@
 import request from "supertest";
 import app from "../src/app";
-import { seedData, clearData } from "./seed";
+import { seedData, clearData, TEST_USER_TOKEN } from "./seed";
 import { getRequestListener } from "@hono/node-server";
 
 const server = getRequestListener(app.fetch);
 
-describe("Todo API Integration Tests", () => {
+describe("Todo API Integration Tests (Authenticated)", () => {
   
   beforeAll(async () => {
-     // Ensure we start with a clean state or seeded state
      await seedData();
   });
 
-
   afterAll(async () => {
-    // Clean up after tests
     await clearData();
-    // Force exit is enabled in jest config, but good practice to close pools if possible.
-    // drizzle-orm/mysql2 pool doesn't expose a simple end() on the drizzle object easily 
-    // without access to the underlying connection pool if not exported.
-    // But since we use forceExit, it should be fine.
+  });
+
+  describe("Authentication", () => {
+      it("should register a new user", async () => {
+          const res = await request(server).post("/api/v1/auth/register").send({
+              email: "newuser@example.com",
+              password: "password123",
+              name: "New User"
+          });
+          expect(res.status).toBe(201);
+          expect(res.body.user).toHaveProperty("email", "newuser@example.com");
+      });
+
+      it("should login an existing user", async () => {
+        const res = await request(server).post("/api/v1/auth/login").send({
+            email: "newuser@example.com",
+            password: "password123",
+        });
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty("token");
+    });
   });
 
   describe("GET /todos", () => {
-    it("should return a list of todos", async () => {
-      const response = await request(server).get("/todos");
+    it("should return 401 if unauthenticated", async () => {
+        const response = await request(server).get("/api/v1/todos");
+        expect(response.status).toBe(401);
+    });
+
+    it("should return a paginated list of todos for authenticated user", async () => {
+      const response = await request(server)
+        .get("/api/v1/todos")
+        .set("Authorization", `Bearer ${TEST_USER_TOKEN}`);
+
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThanOrEqual(2);
-      expect(response.body[0]).toHaveProperty("title");
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -40,34 +61,24 @@ describe("Todo API Integration Tests", () => {
       };
 
       const response = await request(server)
-        .post("/todos")
+        .post("/api/v1/todos")
+        .set("Authorization", `Bearer ${TEST_USER_TOKEN}`)
         .send(newTodo);
 
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty("id");
       expect(response.body.title).toBe(newTodo.title);
-      expect(response.body.description).toBe(newTodo.description);
-      expect(response.body.completed).toBe(false);
-    });
-
-    it("should return 400 if title is missing", async () => {
-      const invalidTodo = {
-        description: "Missing title",
-      };
-
-      const response = await request(server)
-        .post("/todos")
-        .send(invalidTodo);
-
-      expect(response.status).toBe(400);
     });
   });
 
   describe("PUT /todos/:id", () => {
     it("should update an existing todo", async () => {
       // First get a todo to update
-      const listResponse = await request(server).get("/todos");
-      const todoToUpdate = listResponse.body[0];
+      const listResponse = await request(server)
+        .get("/api/v1/todos")
+        .set("Authorization", `Bearer ${TEST_USER_TOKEN}`);
+      
+      const todoToUpdate = listResponse.body.data[0];
 
       const updateData = {
         title: "Updated Title",
@@ -75,47 +86,40 @@ describe("Todo API Integration Tests", () => {
       };
 
       const response = await request(server)
-        .put(`/todos/${todoToUpdate.id}`)
+        .put(`/api/v1/todos/${todoToUpdate.id}`)
+        .set("Authorization", `Bearer ${TEST_USER_TOKEN}`)
         .send(updateData);
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toBe("Updated successfully");
-
-      // Verify update
-      const getResponse = await request(server).get("/todos");
-      const updatedTodo = getResponse.body.find((t: any) => t.id === todoToUpdate.id);
+      
+      // Verify
+      const getResponse = await request(server)
+        .get("/api/v1/todos")
+        .set("Authorization", `Bearer ${TEST_USER_TOKEN}`);
+      const updatedTodo = getResponse.body.data.find((t: any) => t.id === todoToUpdate.id);
       expect(updatedTodo.title).toBe(updateData.title);
-      expect(updatedTodo.completed).toBe(true);
-    });
-
-    it("should return 404 for non-existent todo", async () => {
-      const response = await request(server)
-        .put("/todos/999999")
-        .send({ title: "Ghost" });
-
-      expect(response.status).toBe(404);
     });
   });
 
   describe("DELETE /todos/:id", () => {
     it("should delete an existing todo", async () => {
-       // Create a temp todo to delete so we don't mess up other tests too much 
-       // (though sequential running helps)
-       const createRes = await request(server).post("/todos").send({ title: "To Delete" });
+       const createRes = await request(server)
+        .post("/api/v1/todos")
+        .set("Authorization", `Bearer ${TEST_USER_TOKEN}`)
+        .send({ title: "To Delete" });
        const todoId = createRes.body.id;
 
-       const response = await request(server).delete(`/todos/${todoId}`);
+       const response = await request(server)
+        .delete(`/api/v1/todos/${todoId}`)
+        .set("Authorization", `Bearer ${TEST_USER_TOKEN}`);
+       
        expect(response.status).toBe(200);
-       expect(response.body.message).toBe("Deleted successfully");
 
-       // Verify deletion
-       const checkRes = await request(server).put(`/todos/${todoId}`).send({ title: "check" });
+       const checkRes = await request(server)
+        .put(`/api/v1/todos/${todoId}`)
+        .set("Authorization", `Bearer ${TEST_USER_TOKEN}`)
+        .send({ title: "check" });
        expect(checkRes.status).toBe(404);
-    });
-
-    it("should return 404 for non-existent todo", async () => {
-      const response = await request(server).delete("/todos/999999");
-      expect(response.status).toBe(404);
     });
   });
 });

@@ -16,6 +16,9 @@
   "license": "ISC",
   "dependencies": {
     "@hono/node-server": "^1.19.9",
+    "@hono/zod-validator": "^0.7.6",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.4",

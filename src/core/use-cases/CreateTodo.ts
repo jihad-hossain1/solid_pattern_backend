@@ -4,10 +4,10 @@ import { Todo } from "../entities/Todo";
 export class CreateTodo {
   constructor(private todoRepository: ITodoRepository) {}
 
-  async execute(title: string, description: string | null): Promise<Todo> {
+  async execute(userId: number, title: string, description: string | null): Promise<Todo> {
     if (!title) {
       throw new Error("Title is required");
     }
-    return this.todoRepository.create({ title, description, completed: false });
+    return this.todoRepository.create({ userId, title, description, completed: false });
   }
 }

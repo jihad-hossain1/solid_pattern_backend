@@ -1,10 +1,11 @@
-import { ITodoRepository } from "../repositories/ITodoRepository";
+import { ITodoRepository, PaginatedResult } from "../repositories/ITodoRepository";
 import { Todo } from "../entities/Todo";
 
 export class GetTodos {
   constructor(private todoRepository: ITodoRepository) {}
 
-  async execute(): Promise<Todo[]> {
-    return this.todoRepository.findAll();
+  async execute(userId: number, page: number, limit: number): Promise<PaginatedResult<Todo>> {
+    const offset = (page - 1) * limit;
+    return this.todoRepository.findAll(userId, offset, limit);
   }
 }
