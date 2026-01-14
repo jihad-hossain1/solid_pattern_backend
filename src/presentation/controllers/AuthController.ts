@@ -21,7 +21,8 @@ export class AuthController {
   async login(c: Context) {
     try {
       const body = (c.req as any).valid('json');
-      const secret = process.env.JWT_SECRET || "fallback_secret_do_not_use_in_prod";
+      const secret = process.env.JWT_SECRET;
+      if (!secret) throw new Error("JWT_SECRET is not defined");
       const { user, token } = await this.loginUser.execute(body.email, body.password, secret);
       return c.json({ user, token });
     } catch (error: any) {

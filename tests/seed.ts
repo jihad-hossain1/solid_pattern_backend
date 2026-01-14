@@ -29,8 +29,9 @@ export const seedData = async () => {
       sub: userId,
       exp: Math.floor(Date.now() / 1000) + 60 * 60,
     };
-   // Use default secret from code
-   TEST_USER_TOKEN = await sign(payload, "fallback_secret_do_not_use_in_prod");
+   // Use secret from env or default for tests if env not loaded yet (but it should be)
+   const secret = process.env.JWT_SECRET || "fallback_secret_do_not_use_in_prod"; 
+   TEST_USER_TOKEN = await sign(payload, secret);
 
   // Insert seed todos
   await db.insert(todos).values([
