@@ -10,8 +10,15 @@ export class AuthController {
 
   async register(c: Context) {
     try {
-      const body = (c.req as any).valid('json');
-      const user = await this.registerUser.execute(body.email, body.password, body.name);
+      const body = (c.req as any).valid("json");
+      const user = await this.registerUser.execute({
+        email: body.email,
+        password: body.password,
+        username: body.username,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        mobile: body.mobile,
+      });
       return c.json({ user }, 201);
     } catch (error: any) {
       return c.json({ error: error.message }, 400);
@@ -20,14 +27,18 @@ export class AuthController {
 
   async login(c: Context) {
     try {
-      const body = (c.req as any).valid('json');
+      const body = (c.req as any).valid("json");
       const secret = process.env.JWT_SECRET;
       if (!secret) throw new Error("JWT_SECRET is not defined");
-      const { user, token } = await this.loginUser.execute(body.email, body.password, secret);
+      const { user, token } = await this.loginUser.execute(
+        body.email,
+        body.password,
+        secret
+      );
       return c.json({ user, token });
     } catch (error: any) {
       if (error.message === "Invalid credentials") {
-          return c.json({ error: error.message }, 401);
+        return c.json({ error: error.message }, 401);
       }
       return c.json({ error: error.message }, 400);
     }
